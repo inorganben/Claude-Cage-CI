@@ -9,3 +9,5 @@ bool cageLoginClick(int x, int y);
 bool cageLoginScroll(int x, int y, int deltaX, int deltaY);
 bool cageLoginKey(int code, bool shift);
 bool cageLoginSelectAll(void);
+bool cageDesktopShow(bool open);
+bool cageDesktopVisible(void);

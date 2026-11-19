@@ -101,6 +101,18 @@ func TestMacOSReadyBrowserRoutesUseNativeGuest(t *testing.T) {
 	}
 }
 
+// The guest desktop is a host window owned by the native Mac runner. It must
+// stay on the local route set so a remote client cannot raise windows on the
+// host, and it must not be confusable with the SSH-forwarded screen sharing.
+func TestMacOSDesktopRouteStaysLocal(t *testing.T) {
+	if !macOSWorkbenchRoute("/api/environment/macos-desktop") {
+		t.Fatal("guest desktop route is not handled by the native Mac guest")
+	}
+	if macOSWorkbenchRoute("/api/environment/macos-desktop/remote") {
+		t.Fatal("guest desktop accepted an unexpected sub-path")
+	}
+}
+
 func TestMacOSProjectRejectsSiblingProfileAndCredentials(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

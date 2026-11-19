@@ -1,10 +1,24 @@
 #import "macos-setup-view.h"
 #include <math.h>
 
+@interface CageDesktopWindowDelegate : NSObject <NSWindowDelegate>
+@end
+
+@implementation CageDesktopWindowDelegate
+// The virtual machine runner is a background process. Once the desktop window
+// is gone it must not keep a Dock or menu bar presence.
+- (void)windowWillClose:(NSNotification *)notification {
+    (void)notification;
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
+}
+@end
+
 @implementation CageGuestSetupView {
     NSWindow *_window;
     VZVirtualMachineView *_view;
     BOOL (^_authorized)(void);
+    CageDesktopWindowDelegate *_desktopDelegate;
+    BOOL _desktopSized;
 }
 
 - (instancetype)initWithMachine:(VZVirtualMachine *)machine
@@ -113,5 +127,48 @@
     _window.contentView = nil;
     _view = nil;
     _window = nil;
+    _desktopDelegate = nil;
+}
+
+- (void)showDesktop {
+    if (![self canUseView]) return;
+    if (!_desktopDelegate) _desktopDelegate = [CageDesktopWindowDelegate new];
+    NSWindowStyleMask style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+        NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
+    if (_window.styleMask != style) {
+        _window.styleMask = style;
+        _window.title = @"Cage 客机桌面";
+        _window.releasedWhenClosed = NO;
+        _window.delegate = _desktopDelegate;
+        [_window setContentMinSize:NSMakeSize(640, 400)];
+    }
+    if (!_desktopSized) {
+        _desktopSized = YES;
+        NSScreen *screen = NSScreen.mainScreen;
+        NSRect visible = screen.visibleFrame, frame = _window.frame;
+        if (!NSIsEmptyRect(visible) && frame.size.width > 0 && frame.size.height > 0) {
+            CGFloat scale = fmin(1, fmin((NSWidth(visible) - 40) / NSWidth(frame),
+                                         (NSHeight(visible) - 40) / NSHeight(frame)));
+            if (scale > 0.2 && scale < 1) {
+                frame.size = NSMakeSize(round(NSWidth(frame) * scale), round(NSHeight(frame) * scale));
+                [_window setFrame:frame display:NO];
+            }
+        }
+        [_window center];
+    }
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+    [_window makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+    [_window makeFirstResponder:_view];
+}
+
+- (void)hideDesktop {
+    if (!_window) return;
+    [_window orderOut:nil];
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
+}
+
+- (BOOL)desktopVisible {
+    return _window != nil && _window.isVisible && self.canUseView;
 }
 @end

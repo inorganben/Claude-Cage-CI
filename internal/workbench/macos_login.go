@@ -342,6 +342,64 @@ func (s *Server) macOSLoginWindow(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// macOSDesktop raises the host window that renders the guest scanout directly.
+// A virtual Mac cannot capture its own display, so the system Screen Sharing
+// service authenticates and then fails with "Unable to capture screen". This
+// path shows the same virtual display Cage already renders, with native host
+// pointer and keyboard focus, and needs no guest service or TCC grant.
+func (s *Server) macOSDesktop(w http.ResponseWriter, r *http.Request) {
+	if s.macosGuest == nil || !s.hasTrustedView(r) {
+		http.NotFound(w, r)
+		return
+	}
+	var input guestos.MacLoginRequest
+	if !readJSON(w, r, &input) {
+		return
+	}
+	var action string
+	switch input.Action {
+	case "open":
+		action = "desktop-open"
+	case "close":
+		action = "desktop-close"
+	case "status":
+		action = "desktop-status"
+	default:
+		http.Error(w, "无效的客机桌面操作", http.StatusBadRequest)
+		return
+	}
+	s.mu.Lock()
+	ready, closing := s.ready, s.closing
+	s.mu.Unlock()
+	if !ready || closing {
+		http.Error(w, "客机桌面尚未就绪", http.StatusConflict)
+		return
+	}
+	timeout := 8 * time.Second
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+	var dial net.Dialer
+	conn, err := dial.DialContext(ctx, "unix", filepath.Join(s.instanceDir(), "cage-login.sock"))
+	if err != nil {
+		http.Error(w, "这台客机尚未启动带桌面控件的运行器", http.StatusConflict)
+		return
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+	var result guestos.MacLoginReply
+	if json.NewEncoder(conn).Encode(guestos.MacLoginRequest{Action: action}) != nil ||
+		json.NewDecoder(io.LimitReader(conn, 64<<10)).Decode(&result) != nil {
+		http.Error(w, "客机桌面无法响应", http.StatusServiceUnavailable)
+		return
+	}
+	if result.Error != "" {
+		http.Error(w, result.Error, http.StatusConflict)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	jsonReply(w, map[string]bool{"desktop": result.Desktop})
+}
+
 func (s *Server) macOSSetupAdminCommand(ctx context.Context) *exec.Cmd {
 	user, err := guestos.MacOSProvisionUser(s.profile)
 	if err != nil {

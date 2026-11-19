@@ -28,6 +28,7 @@ type MacLoginReply struct {
 	Recovery           string `json:"recovery,omitempty"`
 	Administrator      string `json:"administrator,omitempty"`
 	MaintenanceVersion int    `json:"maintenance_version,omitempty"`
+	Desktop            bool   `json:"desktop,omitempty"`
 }
 
 func ValidMacMaintenancePurpose(value string) bool {

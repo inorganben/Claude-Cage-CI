@@ -45,6 +45,8 @@ func (vzSurface) Scroll(x, y, dx, dy int) bool {
 	return bool(C.cageLoginScroll(C.int(x), C.int(y), C.int(dx), C.int(dy)))
 }
 func (vzSurface) SelectAll() bool { return bool(C.cageLoginSelectAll()) }
+func (vzSurface) Desktop(open bool) bool { return bool(C.cageDesktopShow(C.bool(open))) }
+func (vzSurface) DesktopVisible() bool   { return bool(C.cageDesktopVisible()) }
 func (vzSurface) Image(region []int) ([]byte, error) {
 	var size C.int
 	var data unsafe.Pointer

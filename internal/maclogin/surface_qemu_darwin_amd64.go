@@ -198,6 +198,12 @@ func (s *qemuSurface) SelectAll() bool {
 	defer s.mu.Unlock()
 	return s.enabled && s.press("a", false, true)
 }
+
+// Intel guests have no host-rendered view to raise, so the desktop entry stays
+// unavailable instead of pretending to open a window.
+func (s *qemuSurface) Desktop(open bool) bool { return false }
+func (s *qemuSurface) DesktopVisible() bool   { return false }
+
 func (s *qemuSurface) Scroll(x, y, dx, dy int) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()

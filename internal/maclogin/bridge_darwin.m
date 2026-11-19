@@ -6,9 +6,16 @@
 
 static VZVirtualMachine *machine;
 static CageGuestSetupView *loginView;
+static BOOL loginEnabled, desktopOpen;
 // Match the virtual Mac's scanout. The input protocol retains its original
 // 16:10 coordinate system, regardless of host window size or display scaling.
 static const CGFloat scanWidth = 1920, scanHeight = 1200;
+
+static void ensureLoginView(void) {
+    if (loginView || !machine) return;
+    loginView = [[CageGuestSetupView alloc] initWithMachine:machine size:NSMakeSize(scanWidth,scanHeight)
+        setupAuthorized:^BOOL { return machine != nil; }];
+}
 
 void cageLoginLoop(void *ref) {
     @autoreleasepool {
@@ -28,10 +35,41 @@ void cageLoginStop(void) {
 }
 void cageLoginEnable(bool enabled) {
     dispatch_sync(dispatch_get_main_queue(), ^{
+        loginEnabled = enabled;
+        // The desktop window shares the same view. Keep it alive while the
+        // guest desktop is open and destroy it once both are closed.
+        if (!enabled && desktopOpen) return;
         [loginView close]; loginView = nil;
-        if (enabled && machine) loginView = [[CageGuestSetupView alloc] initWithMachine:machine size:NSMakeSize(scanWidth,scanHeight)
-            setupAuthorized:^BOOL { return machine != nil; }];
+        if (enabled) ensureLoginView();
     });
+}
+
+bool cageDesktopShow(bool open) {
+    __block BOOL ok = NO;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @autoreleasepool {
+            if (open) {
+                ensureLoginView();
+                [loginView showDesktop];
+                desktopOpen = loginView != nil && [loginView desktopVisible];
+                ok = desktopOpen;
+            } else {
+                [loginView hideDesktop];
+                desktopOpen = NO;
+                if (!loginEnabled) { [loginView close]; loginView = nil; }
+                ok = YES;
+            }
+        }
+    });
+    return ok;
+}
+
+bool cageDesktopVisible(void) {
+    __block BOOL visible = NO;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        visible = loginView != nil && [loginView desktopVisible];
+    });
+    return visible;
 }
 void *cageLoginImage(int *size) {
     __block void *copy = NULL;

@@ -102,6 +102,9 @@ func (s *loginSession) close() {
 }
 
 func (s *loginSession) handle(in request) reply {
+	if in.Action == "desktop-open" || in.Action == "desktop-close" || in.Action == "desktop-status" {
+		return s.handleDesktop(in.Action)
+	}
 	if in.Maintenance != "" || (s.maintenance != "" && in.Action != "open") {
 		return s.handleMaintenance(in)
 	}
@@ -179,4 +182,23 @@ func (s *loginSession) handle(in request) reply {
 		return reply{Error: "未知的登录操作"}
 	}
 	return reply{}
+}
+
+// handleDesktop raises or dismisses the host window that shows the guest
+// scanout directly. It is independent of the authenticated login session
+// because the window owns no credential and forwards no guest input through
+// this protocol.
+func (s *loginSession) handleDesktop(action string) reply {
+	switch action {
+	case "desktop-open":
+		if !s.surface.Desktop(true) {
+			return reply{Error: "暂时无法显示客机桌面。请确认虚拟 Mac 已启动后再试。"}
+		}
+		return reply{Desktop: true}
+	case "desktop-close":
+		s.surface.Desktop(false)
+		return reply{}
+	default:
+		return reply{Desktop: s.surface.DesktopVisible()}
+	}
 }

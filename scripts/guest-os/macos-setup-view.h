@@ -16,6 +16,11 @@ NS_ASSUME_NONNULL_BEGIN
 // Click in the view's logical coordinates, with the origin at its top left.
 - (BOOL)clickAtX:(CGFloat)x y:(CGFloat)y;
 - (BOOL)scrollAtX:(CGFloat)x y:(CGFloat)y deltaX:(CGFloat)deltaX deltaY:(CGFloat)deltaY;
+// Present the same view as an ordinary resizable desktop window on the host.
+// The guest keeps native pointer and keyboard focus; nothing is streamed.
+- (void)showDesktop;
+- (void)hideDesktop;
+- (BOOL)desktopVisible;
 - (void)close;
 @end
 

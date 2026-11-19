@@ -24,6 +24,10 @@ type loginSurface interface {
 	Key(int, bool) bool
 	Scroll(int, int, int, int) bool
 	SelectAll() bool
+	// Desktop presents the same guest scanout as a host window. It is only
+	// available on the native vz backend; input stays with the host window.
+	Desktop(bool) bool
+	DesktopVisible() bool
 }
 
 func ownsLoginDirectory(dir string) bool {

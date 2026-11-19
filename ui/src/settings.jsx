@@ -642,6 +642,7 @@ export function SettingsPanel({
                     <MacOSLogin maintenance="input" label="辅助功能权限" disabled={!status.ready || busy} />
                   </div>
                 </section>}
+                {status.guest_system === "macos" && !isRemoteClient() && <MacOSDesktopSettings disabled={!status.ready || busy} onError={setError} />}
                 {status.guest_system === "macos" && !isRemoteClient() && <MacOSScreenSharingSettings disabled={!status.ready || busy} onError={setError} />}
                 {!status.storage_recovery?.required && <ResourceSettings status={status} onConfirm={onConfirm} onDirtyChange={setResourceDirty} />}
  <DiagnosticSettings />
@@ -735,6 +736,64 @@ export function SettingsPanel({
   );
 }
 
+function MacOSDesktopSettings({ disabled, onError }) {
+  const [desktopBusy, setDesktopBusy] = useState("");
+  const [desktopOpen, setDesktopOpen] = useState(false);
+  const [desktopChecked, setDesktopChecked] = useState(false);
+  async function run(action) {
+    if (!action) return;
+    setDesktopBusy(action);
+    onError("");
+    try {
+      const result = await api("/environment/macos-desktop", { action });
+      setDesktopOpen(Boolean(result.desktop));
+      setDesktopChecked(true);
+    } catch (error) {
+      onError(error.message);
+    } finally {
+      setDesktopBusy("");
+    }
+  }
+  useEffect(() => {
+    let cancelled = false;
+    api("/environment/macos-desktop", { action: "status" })
+      .then(result => {
+        if (cancelled) return;
+        setDesktopOpen(Boolean(result.desktop));
+        setDesktopChecked(true);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  return (
+    <section aria-label="客机桌面">
+      <h4>完整客机桌面</h4>
+      <p className="field-help">直接打开虚拟 Mac 的完整画面窗口，鼠标和键盘由系统转交给客机，可以在里面安装和调试任意软件。它不经过屏幕共享服务，因此不受客机抓屏权限限制；窗口关闭后客机继续在后台运行。</p>
+      <div className="project-recovery-actions">
+        <button
+          type="button"
+          className="text-button"
+          disabled={disabled || Boolean(desktopBusy)}
+          onClick={() => run(desktopOpen ? "close" : "open")}
+        >
+          {desktopBusy ? <LoaderCircle size={14} className="spin" /> : null}
+          {desktopOpen ? "关闭客机桌面" : "打开客机桌面"}
+        </button>
+        <button
+          type="button"
+          className="text-button"
+          disabled={disabled || Boolean(desktopBusy)}
+          onClick={() => run("status")}
+        >
+          检查桌面窗口
+        </button>
+      </div>
+      {desktopChecked && !desktopOpen && <p role="status">客机桌面窗口当前未打开。</p>}
+      {desktopOpen && <p role="status">客机桌面已在宿主机上打开，请切换到「Cage 客机桌面」窗口。</p>}
+    </section>
+  );
+}
+
 function MacOSScreenSharingSettings({ disabled, onError }) {
   const [sharingBusy, setSharingBusy] = useState("");
   const [sharingStatus, setSharingStatus] = useState(null);
@@ -753,7 +812,7 @@ function MacOSScreenSharingSettings({ disabled, onError }) {
   return (
     <section aria-label="客机屏幕共享">
       <h4>客机屏幕共享</h4>
-      <p className="field-help">日常「打开客机屏幕共享」只在本机建立 SSH 环回转发，不给客机增加外网出口，因此不要求先断网。首次安装会在置备阶段启用服务，并在系统授权引导中检查是否真正可用；macOS 26 还需在「系统设置 → 通用 → 共享」中手动打开一次。之后若要重新启用服务或再次打开该设置页，必须先在工作台暂停外网。</p>
+      <p className="field-help">日常「打开客机屏幕共享」只在本机建立 SSH 环回转发，不给客机增加外网出口，因此不要求先断网。首次安装会在置备阶段启用服务，并在系统授权引导中检查是否真正可用；macOS 26 及更新系统还需在「系统设置 → 通用 → 共享」中手动打开一次。之后若要重新启用服务或再次打开该设置页，必须先在工作台暂停外网。虚拟 Mac 的显示设备无法被系统抓屏，连接后若提示「不被允许」或只有黑屏，请改用上面的「打开客机桌面」。</p>
       <ScreenSharingChecks status={sharingStatus} />
       <div className="project-recovery-actions">
         <button
